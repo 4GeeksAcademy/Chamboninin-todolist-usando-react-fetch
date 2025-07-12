@@ -7,17 +7,24 @@ const Home = () => {
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState("");
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && input.trim() !== "") {
-      setTasks([...tasks, { label: input.trim(), id: Date.now() }]);
-      setInput("");
+  // Crear usuario si no existe
+  const createUser = async () => {
+    try {
+      const response = await fetch(`${urlBase}/users/Chambonini`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.ok) {
+        console.log("Usuario creado");
+      }
+    } catch (error) {
+      console.error("Error al crear usuario:", error);
     }
   };
 
-  const deleteTask = (idToDelete) => {
-    setTasks(tasks.filter((task) => task.id !== idToDelete));
-  };
-
+  // Obtener tareas desde la API
   const getAllTask = async () => {
     try {
       const response = await fetch(`${urlBase}/users/Chambonini`);
@@ -25,13 +32,50 @@ const Home = () => {
 
       if (response.ok) {
         setTasks(data.todos);
-      }
-      if (response.status === 404) {
-        // crear usuario aquí si no existe
+      } else if (response.status === 404) {
+        console.warn("Usuario no encontrado, creando...");
+        await createUser();
+        setTasks([]);
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error al obtener tareas:", error);
     }
+  };
+
+  // Actualizar tareas en la API
+  const updateTasks = async (updatedTasks) => {
+    try {
+      await fetch(`${urlBase}/users/Chambonini`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ todos: updatedTasks }),
+      });
+    } catch (error) {
+      console.error("Error al actualizar tareas:", error);
+    }
+  };
+
+  // Agregar nueva tarea
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && input.trim() !== "") {
+      const newTask = {
+        label: input.trim(),
+        is_done: false,
+      };
+      const updatedTasks = [...tasks, newTask];
+      setTasks(updatedTasks);
+      updateTasks(updatedTasks);
+      setInput("");
+    }
+  };
+
+  // Eliminar tarea por índice
+  const deleteTask = (indexToDelete) => {
+    const updatedTasks = tasks.filter((_, index) => index !== indexToDelete);
+    setTasks(updatedTasks);
+    updateTasks(updatedTasks);
   };
 
   useEffect(() => {
@@ -50,10 +94,10 @@ const Home = () => {
           onKeyDown={handleKeyDown}
         />
         <ul className="todo-list">
-          {tasks.map((item) => (
-            <li key={item.id} className="todo-item">
+          {tasks.map((item, index) => (
+            <li key={index} className="todo-item">
               {item.label}
-              <span className="delete" onClick={() => deleteTask(item.id)}>
+              <span className="delete" onClick={() => deleteTask(index)}>
                 ×
               </span>
             </li>
