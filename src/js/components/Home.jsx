@@ -2,85 +2,84 @@ import React, { useEffect, useState } from "react";
 import "../../styles/index.css";
 
 const urlBase = "https://playground.4geeks.com/todo";
+const username = "Chambonini";
 
 const Home = () => {
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState("");
 
-  // Crear usuario si no existe
+  // Leer desde localStorage al iniciar
+  useEffect(() => {
+    const localTasks = localStorage.getItem("localTasks");
+    if (localTasks) {
+      setTasks(JSON.parse(localTasks));
+    } else {
+      getAllTask(); // Solo llama API si no hay local
+    }
+  }, []);
+
+  // Cada cambio en tasks actualiza localStorage
+  useEffect(() => {
+    localStorage.setItem("localTasks", JSON.stringify(tasks));
+  }, [tasks]);
+
+  // Crear usuario
   const createUser = async () => {
     try {
-      const response = await fetch(`${urlBase}/users/Chambonini`, {
+      const response = await fetch(`${urlBase}/users/${username}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([]),
       });
-      if (response.ok) {
-        console.log("Usuario creado");
-      }
+      if (response.ok) console.log("Usuario creado");
     } catch (error) {
       console.error("Error al crear usuario:", error);
     }
   };
 
-  // Obtener tareas desde la API
+  // Obtener tareas desde API si no hay localStorage
   const getAllTask = async () => {
     try {
-      const response = await fetch(`${urlBase}/users/Chambonini`);
+      const response = await fetch(`${urlBase}/users/${username}`);
       const data = await response.json();
-
       if (response.ok) {
         setTasks(data.todos);
       } else if (response.status === 404) {
-        console.warn("Usuario no encontrado, creando...");
         await createUser();
-        setTasks([]);
       }
     } catch (error) {
-      console.error("Error al obtener tareas:", error);
+      console.error("Error obteniendo tareas:", error);
     }
   };
 
-  // Actualizar tareas en la API
-  const updateTasks = async (updatedTasks) => {
+  // Actualizar API siempre que cambien las tareas
+  const updateTasksAPI = async (updatedTasks) => {
     try {
-      await fetch(`${urlBase}/users/Chambonini`, {
+      await fetch(`${urlBase}/users/${username}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ todos: updatedTasks }),
       });
     } catch (error) {
-      console.error("Error al actualizar tareas:", error);
+      console.error("Error actualizando API:", error);
     }
   };
 
-  // Agregar nueva tarea
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && input.trim() !== "") {
-      const newTask = {
-        label: input.trim(),
-        is_done: false,
-      };
+      const newTask = { label: input.trim(), is_done: false };
       const updatedTasks = [...tasks, newTask];
       setTasks(updatedTasks);
-      updateTasks(updatedTasks);
+      updateTasksAPI(updatedTasks);
       setInput("");
     }
   };
 
-  // Eliminar tarea por índice
   const deleteTask = (indexToDelete) => {
     const updatedTasks = tasks.filter((_, index) => index !== indexToDelete);
     setTasks(updatedTasks);
-    updateTasks(updatedTasks);
+    updateTasksAPI(updatedTasks);
   };
-
-  useEffect(() => {
-    getAllTask();
-  }, []);
 
   return (
     <div className="main">
@@ -97,9 +96,7 @@ const Home = () => {
           {tasks.map((item, index) => (
             <li key={index} className="todo-item">
               {item.label}
-              <span className="delete" onClick={() => deleteTask(index)}>
-                ×
-              </span>
+              <span className="delete" onClick={() => deleteTask(index)}>×</span>
             </li>
           ))}
         </ul>
