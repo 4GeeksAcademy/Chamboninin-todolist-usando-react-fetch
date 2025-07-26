@@ -8,22 +8,12 @@ const Home = () => {
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState("");
 
-  // Leer desde localStorage al iniciar
+  // Obtener tareas del servidor al cargar
   useEffect(() => {
-    const localTasks = localStorage.getItem("localTasks");
-    if (localTasks) {
-      setTasks(JSON.parse(localTasks));
-    } else {
-      getAllTask(); // Solo llama API si no hay local
-    }
+    getAllTasks();
   }, []);
 
-  // Cada cambio en tasks actualiza localStorage
-  useEffect(() => {
-    localStorage.setItem("localTasks", JSON.stringify(tasks));
-  }, [tasks]);
-
-  // Crear usuario
+  // Crear usuario si no existe
   const createUser = async () => {
     try {
       const response = await fetch(`${urlBase}/users/${username}`, {
@@ -31,54 +21,81 @@ const Home = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify([]),
       });
-      if (response.ok) console.log("Usuario creado");
+      if (response.ok) {
+        getAllTasks();
+      }
     } catch (error) {
       console.error("Error al crear usuario:", error);
     }
   };
 
-  // Obtener tareas desde API si no hay localStorage
-  const getAllTask = async () => {
+  // Obtener todas las tareas del usuario
+  const getAllTasks = async () => {
     try {
       const response = await fetch(`${urlBase}/users/${username}`);
-      const data = await response.json();
       if (response.ok) {
+        const data = await response.json();
         setTasks(data.todos);
       } else if (response.status === 404) {
-        await createUser();
+        createUser();
       }
     } catch (error) {
-      console.error("Error obteniendo tareas:", error);
+      console.error("Error al obtener tareas:", error);
     }
   };
 
-  // Actualizar API siempre que cambien las tareas
-  const updateTasksAPI = async (updatedTasks) => {
+  // Agregar una tarea nueva con POST
+  const addTask = async () => {
+    const newTask = { label: input.trim(), is_done: false };
+    if (newTask.label === "") return;
+
     try {
-      await fetch(`${urlBase}/users/${username}`, {
-        method: "PUT",
+      const response = await fetch(`${urlBase}/todos/${username}`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ todos: updatedTasks }),
+        body: JSON.stringify(newTask),
       });
+
+      if (response.ok) {
+        setInput("");
+        getAllTasks();
+      } else {
+        console.error("Error al agregar tarea");
+      }
     } catch (error) {
-      console.error("Error actualizando API:", error);
+      console.error("Error en POST:", error);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && input.trim() !== "") {
-      const newTask = { label: input.trim(), is_done: false };
-      const updatedTasks = [...tasks, newTask];
-      setTasks(updatedTasks);
-      updateTasksAPI(updatedTasks);
-      setInput("");
+  // Eliminar una tarea por ID
+  const deleteTask = async (id) => {
+    try {
+      const response = await fetch(`${urlBase}/todos/${id}`, {
+        method: "DELETE"
+      });
+
+      if (response.ok) {
+        getAllTasks();
+      } else {
+        console.error("Error al eliminar tarea");
+      }
+    } catch (error) {
+      console.error("Error en DELETE:", error);
     }
   };
 
-  const deleteTask = (indexToDelete) => {
-    const updatedTasks = tasks.filter((_, index) => index !== indexToDelete);
-    setTasks(updatedTasks);
-    updateTasksAPI(updatedTasks);
+  // Limpiar todas las tareas
+  const clearAllTasks = async () => {
+    try {
+      const response = await fetch(`${urlBase}/users/${username}`, {
+        method: "DELETE"
+      });
+      if (response.ok) {
+        await createUser(); // recrear usuario y lista vacía
+      }
+    } catch (error) {
+      console.error("Error al limpiar tareas:", error);
+    }
   };
 
   return (
@@ -90,18 +107,23 @@ const Home = () => {
           placeholder="What needs to be done?"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") addTask();
+          }}
         />
         <ul className="todo-list">
-          {tasks.map((item, index) => (
-            <li key={index} className="todo-item">
-              {item.label}
-              <span className="delete" onClick={() => deleteTask(index)}>×</span>
+          {tasks.map((task) => (
+            <li key={task.id} className="todo-item">
+              {task.label}
+              <span className="delete" onClick={() => deleteTask(task.id)}>×</span>
             </li>
           ))}
         </ul>
         <div className="todo-footer">
           {tasks.length} item{tasks.length !== 1 ? "s" : ""} left
+          <button onClick={clearAllTasks} style={{ float: "right", border: "none", background: "transparent", color: "#aaa", cursor: "pointer" }}>
+            Clear all
+          </button>
         </div>
       </div>
     </div>
